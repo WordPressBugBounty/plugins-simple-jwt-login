@@ -3,6 +3,7 @@
 namespace SimpleJWTLogin\Services;
 
 use Exception;
+use SimpleJWTLogin\ErrorCodes;
 use SimpleJWTLogin\Modules\Settings\ProtectEndpointSettings;
 
 class ProtectEndpointService extends BaseService
@@ -57,21 +58,20 @@ class ProtectEndpointService extends BaseService
 
         try {
             $jwt = $this->getJwtFromRequestHeaderOrCookie();
-
             if (empty($jwt)) {
-                if ($this->routeService->wordPressData->isUserLoggedIn()) {
-                    return true;
-                }
-
-                throw new Exception('JWT is not present and we can not search for a user.');
+                throw new Exception('JWT is not present and we can not search for a user.', ErrorCodes::ERR_PROTECT_ENDPOINTS_MISSING_JWT);
             }
-
+            
             $user = $this->routeService->getUserFromJwt($jwt);
             $this->validateJwtRevoked(
                 $this->wordPressData->getUserProperty($user, 'ID'),
                 $jwt
             );
-
+           
+            
+            if ($this->routeService->wordPressData->isUserLoggedIn()) {
+                return true;
+            }
             $this->routeService->wordPressData->loginUser($user);
 
             return true;
@@ -147,8 +147,14 @@ class ProtectEndpointService extends BaseService
             if (empty(trim($protectedURL, '/'))) {
                 continue;
             }
+            // By default, start_with match
+            $match = strpos(strtolower($endpoint), strtolower($protectedURL)) === 0;
 
-            if (strtolower($endpoint) == strtolower($protectedURL)) {
+            if ($protectedEndpoint['match']  === ProtectEndpointSettings::ENDPOINT_MATCH_EXACT) {
+                $match = strtolower($endpoint) == strtolower($protectedURL);
+            }
+
+            if ($match) {
                 switch ($protectedEndpoint['method']) {
                     case ProtectEndpointSettings::REQUEST_METHOD_ALL:
                         $isEndpointProtected = $setValue; // Same as before.
