@@ -29,6 +29,19 @@ class AuthenticateService extends BaseService implements ServiceInterface
         $jwtSettings,
         $user
     ) {
+        $reservedParameters = $jwtSettings->getAuthenticationSettings()->getJwtPayloadParameters();
+
+        // The claim used by /autologin to resolve the target user can be a custom
+        // name (jwt_login_by_parameter) that isn't in the fixed list above.
+        $jwtLoginByParameter = $jwtSettings->getLoginSettings()->getJwtLoginByParameter();
+        if (!empty($jwtLoginByParameter)) {
+            $reservedParameters[] = $jwtLoginByParameter;
+        }
+
+        foreach ($reservedParameters as $reservedParameter) {
+            unset($payload[$reservedParameter]);
+        }
+
         $payload[AuthenticationSettings::JWT_PAYLOAD_PARAM_IAT] = time();
 
         foreach ($jwtSettings->getAuthenticationSettings()->getJwtPayloadParameters() as $parameter) {
